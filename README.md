@@ -1,3 +1,10 @@
+## This fork: the kernel
+
+This repository adds a **kernel** layer on top of the FTC SDK and Pedro Pathing, so OpModes say
+`Robot robot = new Robot();` and never touch `hardwareMap`. Start with
+[the kernel README](TeamCode/src/main/java/org/firstinspires/ftc/teamcode/kernel/README.md), then read the manual in
+[doc/kernel/](doc/kernel/01-overview.md).
+
 ## NOTICE
 
 This repository contains the public FTC SDK for the BIOBUZZ (2026-2027) competition season.

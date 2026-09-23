@@ -26,4 +26,6 @@ android {
 
 dependencies {
     implementation project(':FtcRobotController')
+    annotationProcessor project(':KernelProcessor')
+    testImplementation 'junit:junit:4.13.2'
 }
