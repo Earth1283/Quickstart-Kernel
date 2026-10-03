@@ -26,6 +26,7 @@ public final class PedroMotion implements Motion, Subsystem {
 
     private double requestedForward, requestedLeft, requestedTurn;
     private double driverForwardHeading;
+    private double speedScale = 1.0;
 
     private Vector2D aimTarget;
     private double previousAimError;
@@ -52,9 +53,14 @@ public final class PedroMotion implements Motion, Subsystem {
             current = null;
             mode = Mode.DRIVE;
         }
-        requestedForward = forward;
-        requestedLeft = left;
-        requestedTurn = counterClockwise;
+        requestedForward = forward * speedScale;
+        requestedLeft = left * speedScale;
+        requestedTurn = counterClockwise * speedScale;
+    }
+
+    @Override
+    public void setSpeedScale(double scale) {
+        speedScale = scale;
     }
 
     private boolean exceedsTakeover(double... inputs) {
@@ -63,15 +69,31 @@ public final class PedroMotion implements Motion, Subsystem {
     }
 
     @Override
-    public void follow(Path path) {
+    public Motion follow(Path path) {
         pending.clear();
         start(path);
+        return this;
     }
 
     @Override
-    public void queue(Path... paths) {
+    public Motion queue(Path... paths) {
         pending.addAll(Arrays.asList(paths));
         if (mode != Mode.FOLLOW && !pending.isEmpty()) start(pending.poll());
+        return this;
+    }
+
+    @Override
+    public Motion goTo(Pose target) {
+        Pose here = follower.pose();
+        if (Math.hypot(target.x() - here.x(), target.y() - here.y()) < tuning.goToMinDistance) {
+            return turnTo(target.heading());
+        }
+        return follow(Route.line(here, target));
+    }
+
+    @Override
+    public Motion turnBy(double radians) {
+        return turnTo(Angles.wrap(follower.pose().heading() + radians));
     }
 
     private void start(Path path) {
@@ -105,21 +127,23 @@ public final class PedroMotion implements Motion, Subsystem {
     }
 
     @Override
-    public void turnTo(double heading) {
+    public Motion turnTo(double heading) {
         pending.clear();
         current = null;
         turnTarget = heading;
         Pose pose = follower.pose();
         follower.hold(new Pose(pose.x(), pose.y(), heading));
         mode = Mode.TURN;
+        return this;
     }
 
     @Override
-    public void hold() {
+    public Motion hold() {
         pending.clear();
         current = null;
         follower.hold(follower.pose());
         mode = Mode.HOLD;
+        return this;
     }
 
     @Override

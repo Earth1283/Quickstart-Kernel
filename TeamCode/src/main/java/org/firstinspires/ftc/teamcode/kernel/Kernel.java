@@ -11,6 +11,7 @@ import org.firstinspires.ftc.teamcode.kernel.events.Event;
 import org.firstinspires.ftc.teamcode.kernel.events.EventBus;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +98,14 @@ public final class Kernel {
 
     Iterable<Subsystem> subsystems() {
         return subsystems.values();
+    }
+
+    Map<Class<?>, Subsystem> installed() {
+        return Collections.unmodifiableMap(subsystems);
+    }
+
+    int hubCount() {
+        return hubs.size();
     }
 
     // Must run after every driver is constructed, in case one of them changed the mode.

@@ -124,6 +124,30 @@ public class AnnotationBinderTest {
         void a() {}
     }
 
+    static class ShiftedY {
+        final List<String> fired = new ArrayList<>();
+
+        @OnPress(Key.Y)
+        void plain() {
+            fired.add("plain");
+        }
+
+        @OnPress(value = Key.Y, with = Key.LEFT_BUMPER)
+        void shifted() {
+            fired.add("shifted");
+        }
+    }
+
+    @Test
+    public void withActsAsALayerSoThePlainBindingStaysQuiet() {
+        ShiftedY target = new ShiftedY();
+        input.bind(target);
+        pad1.down.add(Key.LEFT_BUMPER);
+        pad1.down.add(Key.Y);
+        input.update();
+        assertEquals(java.util.Collections.singletonList("shifted"), target.fired);
+    }
+
     @Test
     public void runtimeRejectsWhatTheProcessorRejects() {
         assertBindPanics(new PrivateBinding(), "must not be private");

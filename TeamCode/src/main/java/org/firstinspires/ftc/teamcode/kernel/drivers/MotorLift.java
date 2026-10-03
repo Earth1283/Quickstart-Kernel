@@ -5,7 +5,10 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 import org.firstinspires.ftc.teamcode.kernel.Kernel;
+import org.firstinspires.ftc.teamcode.kernel.errors.ProfileMisconfiguredPanic;
+import org.firstinspires.ftc.teamcode.kernel.init.InitResult;
 import org.firstinspires.ftc.teamcode.kernel.subsystems.Lift;
+import org.firstinspires.ftc.teamcode.kernel.telemetry.Report;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -28,6 +31,7 @@ public final class MotorLift implements Lift {
     private boolean reportedArrival = true;
 
     public MotorLift(Kernel kernel, Config config) {
+        requireEveryLevel(config, kernel.profileName());
         this.kernel = kernel;
         this.config = config;
         this.motor = kernel.device(DcMotorEx.class, config.motorName);
@@ -38,17 +42,26 @@ public final class MotorLift implements Lift {
         motor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
     }
 
+    // A missing level would otherwise read as 0 ticks and send the lift to the floor.
+    private static void requireEveryLevel(Config config, String profileName) {
+        for (Level level : Level.values()) {
+            if (config.ticks.containsKey(level)) continue;
+            throw new ProfileMisconfiguredPanic(profileName + ": MotorLift config has no ticks for " + level
+                    + ". Add config.ticks.put(Lift.Level." + level + ", <ticks>) to the profile.");
+        }
+    }
+
     private int ticksFor(Level level) {
-        Integer ticks = config.ticks.get(level);
-        return ticks == null ? 0 : ticks;
+        return config.ticks.get(level);
     }
 
     @Override
-    public void goTo(Level level) {
-        if (level == target) return;
+    public Lift goTo(Level level) {
+        if (level == target) return this;
         target = level;
         targetDirty = true;
         reportedArrival = false;
+        return this;
     }
 
     @Override
@@ -72,6 +85,17 @@ public final class MotorLift implements Lift {
             reportedArrival = true;
             kernel.emit(AT_TARGET, target);
         }
+    }
+
+    @Override
+    public InitResult init() {
+        return InitResult.ok("encoder zeroed at GROUND");
+    }
+
+    @Override
+    public void report(Report report) {
+        report.data("target", target);
+        report.data("moving", isMoving());
     }
 
     @Override

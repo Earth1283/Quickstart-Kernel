@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.kernel.input;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -13,6 +15,7 @@ public final class Button {
     private final BooleanSupplier source;
     private final Input input;
     private final Map<Button, Button> chords = new HashMap<>();
+    private final List<BooleanSupplier> suppressors = new ArrayList<>();
 
     private boolean down;
     private boolean wasDown;
@@ -29,8 +32,22 @@ public final class Button {
     void sample(long nowNanos) {
         this.nowNanos = nowNanos;
         wasDown = down;
-        down = source.getAsBoolean();
+        down = source.getAsBoolean() && !suppressed();
         if (justPressed()) pressedAtNanos = nowNanos;
+    }
+
+    boolean rawDown() {
+        return source.getAsBoolean();
+    }
+
+    // Pass a condition built from rawDown(), not isDown(), so sampling order can't make it lag a tick.
+    void suppressWhile(BooleanSupplier condition) {
+        suppressors.add(condition);
+    }
+
+    private boolean suppressed() {
+        for (BooleanSupplier suppressor : suppressors) if (suppressor.getAsBoolean()) return true;
+        return false;
     }
 
     public String name() {

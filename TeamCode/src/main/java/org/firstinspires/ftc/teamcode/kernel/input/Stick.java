@@ -5,12 +5,19 @@ public final class Stick {
     private final PadAxis rightAxis;
     private final PadAxis upAxis;
     private final double deadband;
+    private final double exponent;
 
-    Stick(PadSource source, PadAxis rightAxis, PadAxis upAxis, double deadband) {
+    Stick(PadSource source, PadAxis rightAxis, PadAxis upAxis, double deadband, double exponent) {
         this.source = source;
         this.rightAxis = rightAxis;
         this.upAxis = upAxis;
         this.deadband = deadband;
+        this.exponent = exponent;
+    }
+
+    // Exponent above 1 softens small deflections for fine control while still reaching full scale.
+    public Stick curve(double exponent) {
+        return new Stick(source, rightAxis, upAxis, deadband, exponent);
     }
 
     public double right() {
@@ -33,7 +40,7 @@ public final class Stick {
     private double radialScale() {
         double r = Math.hypot(source.axis(rightAxis), source.axis(upAxis));
         if (r <= deadband) return 0;
-        double clamped = Math.min(r, 1);
-        return (clamped - deadband) / (1 - deadband) / r;
+        double magnitude = (Math.min(r, 1) - deadband) / (1 - deadband);
+        return Math.pow(magnitude, exponent) / r;
     }
 }

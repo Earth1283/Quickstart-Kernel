@@ -49,4 +49,24 @@ public final class SdkPadSource implements PadSource {
             default: throw new IllegalArgumentException(axis.name());
         }
     }
+
+    @Override
+    public boolean connected() {
+        return gamepad.get().getGamepadId() != Gamepad.ID_UNASSOCIATED;
+    }
+
+    @Override
+    public void rumble(double left, double right, int millis) {
+        gamepad.get().rumble(left, right, millis);
+    }
+
+    @Override
+    public void rumbleBlips(int count) {
+        gamepad.get().rumbleBlips(count);
+    }
+
+    @Override
+    public void led(double red, double green, double blue) {
+        gamepad.get().setLedColor(red, green, blue, Gamepad.LED_DURATION_CONTINUOUS);
+    }
 }

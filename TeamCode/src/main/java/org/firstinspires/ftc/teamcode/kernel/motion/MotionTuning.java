@@ -7,4 +7,5 @@ public final class MotionTuning {
     public double aimMaxTurn = 0.8;
     public double turnToleranceRadians = Math.toRadians(2);
     public double driverTakeoverThreshold = 0.05;
+    public double goToMinDistance = 0.5;
 }

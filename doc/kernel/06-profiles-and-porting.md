@@ -20,11 +20,47 @@ public interface RobotProfile {
     Follower follower(HardwareMap hardwareMap);          // required
     default Claw claw(Kernel kernel) { return null; }    // null = this robot has no claw
     default Lift lift(Kernel kernel) { return null; }
+    default Intake intake(Kernel kernel) { return null; }
+    default Flywheel flywheel(Kernel kernel) { return null; }
+    default Turret turret(Kernel kernel) { return null; }
+    default Rangefinder rangefinder(Kernel kernel) { return null; }
+    default Map<Class<? extends Subsystem>, Subsystem> custom(Kernel kernel) { return emptyMap(); }
+    default List<InitTask> initTasks(Kernel kernel) { return emptyList(); }
+    default double lowBatteryVolts() { return 12.0; }
     default MotionTuning motionTuning() { return new MotionTuning(); }
     default double stickDeadband() { return 0.05; }
+    default double stickCurve() { return 1.0; }          // response curve for every stick; >1 = finer near center
     default String name() { return getClass().getSimpleName(); }
 }
 ```
+
+## The stock mechanisms
+
+| Interface     | Driver                | Userspace                                                        | Events                         |
+|---------------|-----------------------|------------------------------------------------------------------|--------------------------------|
+| `Claw`        | `ServoClaw`           | `open()`, `close()`, `toggle()`                                  | `OPEN_REFUSED`                 |
+| `Lift`        | `MotorLift`           | `goTo(Level)`; every `Level` needs a `ticks` entry or boot panics | `AT_TARGET`                    |
+| `Intake`      | `MotorIntake`         | `in()`, `out()`, `idle()`, `mode()`                              | `JAMMED` (sustained over-current) |
+| `Flywheel`    | `MotorFlywheel`       | `spinTo(ticksPerSecond)`, `spinDown()`, `velocity()`, `isReady()` | `READY` (held within tolerance) |
+| `Turret`      | `MotorTurret`         | `turnTo(radians)`, `angle()`, `isMoving()`                       | `AT_ANGLE`                     |
+| `Rangefinder` | `DistanceRangefinder` | `inches()`, `isDetecting()`                                      | `DETECTED`, `CLEARED`          |
+
+```java
+@Override
+public Flywheel flywheel(Kernel kernel) {
+    MotorFlywheel.Config config = new MotorFlywheel.Config();
+    config.motorName = "shooter";
+    return new MotorFlywheel(kernel, config);
+}
+```
+
+Each is a `robot.` field (`robot.flywheel.spinTo(1500)`) and a stand-in panics only if used on a robot without it.
+`Lift`, `Turret` and `Flywheel` commands return the subsystem, and all three can be passed to `robot.await(...)`:
+a lift or turret has settled when it's within tolerance of its target, and a flywheel when it's `isReady()` (or
+told to stop).
+
+For a mechanism the kernel has no interface for, return it from `custom()` and fetch it with
+`robot.get(Wrist.class)` (checked `SubsystemUnavailableException` if the profile lacks it).
 
 ## Adding a second robot
 

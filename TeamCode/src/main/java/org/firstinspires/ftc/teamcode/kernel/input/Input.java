@@ -17,9 +17,13 @@ public final class Input {
     private final LongSupplier clock;
 
     public Input(PadSource gamepad1, PadSource gamepad2, double stickDeadband, LongSupplier nanoClock) {
+        this(gamepad1, gamepad2, stickDeadband, 1.0, nanoClock);
+    }
+
+    public Input(PadSource gamepad1, PadSource gamepad2, double stickDeadband, double stickCurve, LongSupplier nanoClock) {
         this.clock = nanoClock;
-        gp1 = new Pad("gp1", gamepad1, stickDeadband, this);
-        gp2 = new Pad("gp2", gamepad2, stickDeadband, this);
+        gp1 = new Pad("gp1", gamepad1, stickDeadband, stickCurve, this);
+        gp2 = new Pad("gp2", gamepad2, stickDeadband, stickCurve, this);
     }
 
     public Pad pad(int gamepad) {
@@ -33,8 +37,17 @@ public final class Input {
     }
 
     public void update() {
+        sample();
+        fireBindings();
+    }
+
+    public void sample() {
         long now = clock.getAsLong();
         for (Button button : buttons) button.sample(now);
+    }
+
+    public void fireBindings() {
+        long now = clock.getAsLong();
         for (Binding binding : new ArrayList<>(bindings)) fire(binding, now);
     }
 

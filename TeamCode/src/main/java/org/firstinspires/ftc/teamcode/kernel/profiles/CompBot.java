@@ -53,4 +53,9 @@ public class CompBot implements RobotProfile {
         config.ticks.put(Lift.Level.HIGH, 2100);
         return new MotorLift(kernel, config);
     }
+
+    @Override
+    public double stickCurve() {
+        return 2.0;
+    }
 }

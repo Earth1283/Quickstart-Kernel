@@ -9,7 +9,8 @@ There are two front ends over the same engine: **annotations** and a **fluent AP
 ## Annotations
 
 Put them on methods of your OpMode. `new Robot()` binds them automatically. To bind another object (a helper
-class that owns some controls), call `robot.input.bind(obj)`.
+class that owns some controls), call `robot.bind(obj)`. That also picks up its `@Watch` and `@Every` members
+([Telemetry](10-telemetry.md), [Timers](12-timers-and-match.md)). `robot.input.bind(obj)` binds keys only.
 
 | Annotation       | Fires                                                         | Method signature        |
 |------------------|---------------------------------------------------------------|-------------------------|
@@ -26,7 +27,7 @@ Common attributes:
 |-------------|---------|----------------------------------------------------------------------------------|
 | `value`     | —       | the `Key`                                                                        |
 | `gamepad`   | `1`     | `1` or `2`                                                                       |
-| `with`      | `{}`    | modifier keys that must also be down: `with = Key.LEFT_BUMPER` or `with = {…}`   |
+| `with`      | `{}`    | layer modifiers: `with = Key.LEFT_BUMPER` or `with = {…}` (see [layers](#chords-and-layers)) |
 | `threshold` | `0.5`   | for `LEFT_TRIGGER`/`RIGHT_TRIGGER` only: how far the trigger counts as "down"    |
 
 ```java
@@ -35,7 +36,7 @@ Common attributes:
 @OnPress(value = Key.Y, gamepad = 2, with = Key.LEFT_BUMPER) void faceGoal() { ... }
 @WhileHeld(Key.RIGHT_BUMPER)                          void aim() { robot.motion.aimTo(goal); }
 @OnRelease(Key.RIGHT_BUMPER)                          void stopAim() { robot.motion.stopAiming(); }
-@OnToggle(Key.LEFT_STICK_BUTTON)                      void slowMode(boolean on) { speed = on ? 0.35 : 1; }
+@OnToggle(Key.LEFT_STICK_BUTTON)                      void slowMode(boolean on) { robot.motion.setSpeedScale(on ? 0.35 : 1); }
 @OnLongPress(value = Key.BACK, ms = 600)              void rezero() { robot.motion.resetDriverForward(); }
 @OnDoubleTap(Key.B)                                   void abort() { robot.motion.cancel(); }
 @OnPress(value = Key.RIGHT_TRIGGER, threshold = 0.8)  void squeeze() { robot.claw.close(); }
@@ -98,6 +99,51 @@ next loop), not before the first one.
   already fixed.
 - A **radial** deadband (profile `stickDeadband()`, default 0.05) is applied to the stick as a whole, and the
   output is rescaled so it still starts at 0 and reaches ±1.
+- A response curve (profile `stickCurve()`, default 1 = linear) is applied to every stick. Above 1 it softens
+  small deflections for fine control and still reaches ±1 at full push.
+- `curve(exponent)` returns a copy of a stick with a different curve, for one-off overrides:
+  `robot.gp1.leftStick.curve(3).up()`. It builds a new object each call, so keep it in a field if you call it
+  every loop.
+
+## Chords and layers
+
+```java
+robot.gp1.chord(Key.LEFT_BUMPER, Key.A).onPress(...);        // down only while every key is down
+
+Layer shift = robot.gp2.layer(Key.LEFT_BUMPER);              // a modifier key
+shift.button(Key.A).onPress(() -> robot.claw.open());        // LB+A
+shift.isActive();                                            // is LB held right now?
+robot.gp2.layer(Key.LEFT_BUMPER, Key.RIGHT_BUMPER);          // several modifiers, held together
+```
+
+```java
+@OnPress(value = Key.A, gamepad = 2, with = Key.LEFT_BUMPER)  void open() { ... }   // the same LB+A layer
+```
+
+A layer button is exclusive, and the most specific layer wins: while `LB` is held, the plain `A` reports as up,
+so `A` and `LB+A` never both fire. While `LB` and `RB` are both held, `LB+RB+A` fires and `LB+A`, `RB+A` and `A`
+stay quiet. The modifiers themselves still report normally, so a binding on `LB` alone still fires.
+
+Chords are *not* exclusive: `chord(LB, A)` or `leftBumper.and(a)` fires alongside the plain `A`. Use a layer
+unless you specifically want both.
+
+## Feedback
+
+```java
+robot.gp2.rumble(200);               // both motors, milliseconds
+robot.gp2.rumble(0.2, 1.0, 400);     // left, right, milliseconds
+robot.gp2.rumbleBlips(3);
+robot.gp1.led(1, 0, 0);              // DualShock 4 / DualSense light bar, until changed
+robot.gp1.isConnected();
+```
+
+`robot.alliance(...)` already paints both light bars blue or red. Output goes through the same `PadSource` as
+input, so tests can record it.
+
+## Init and bindings
+
+Before the OpMode is started, `tick()` still samples the gamepads (so `robot.gp1.x.justPressed()` works for picking an
+alliance in init) but **key bindings stay disarmed** until start. A stray press during init can't move a mechanism.
 
 ## Timing semantics
 
@@ -106,10 +152,10 @@ next loop), not before the first one.
 - `@OnDoubleTap` fires on the second press if it lands within `windowMs` of the first, then resets. A triple tap
   counts as one double tap plus a first tap.
 - Bindings fire in the order they were registered. A chord (`LB+A`) doesn't suppress the plain `A` binding: both
-  fire. If you need exclusivity, guard the plain binding with `if (robot.gp1.leftBumper.isDown()) return;`.
+  fire. A layer (`layer(LB)` or `with = LB`) does.
 
 ## Errors
 
 A handler that throws becomes a `BindingPanic` naming the binding, e.g.
 `@OnPress(A) MyTeleOp.toggleClaw() threw java.lang.IllegalStateException: ...`. Handlers run inside `tick()`,
-so they must not call `tick()`, `sleep()`, `waitUntil()` or `waitForMotion()`. That's a `TickReentrancyPanic`.
+so they must not call `tick()`, `sleep()`, `waitUntil()` or `await()`. That's a `TickReentrancyPanic`.

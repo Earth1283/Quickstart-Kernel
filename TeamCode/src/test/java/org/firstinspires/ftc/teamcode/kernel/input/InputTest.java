@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.kernel.input;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Before;
@@ -210,5 +211,107 @@ public class InputTest {
         pad1.axes.put(PadAxis.LEFT_STICK_RIGHT, 0.0);
         pad1.axes.put(PadAxis.LEFT_STICK_UP, 0.55);
         assertEquals(0.5, input.gp1.leftStick.up(), 1e-9);
+    }
+
+    @Test
+    public void chordIsDownOnlyWhenEveryKeyIs() {
+        Button chord = input.gp1.chord(Key.A, Key.B, Key.X);
+        press(Key.A);
+        press(Key.B);
+        tick(20);
+        assertFalse(chord.isDown());
+        press(Key.X);
+        tick(20);
+        assertTrue(chord.isDown());
+    }
+
+    @Test
+    public void layerButtonFiresInsteadOfTheBaseButton() {
+        List<String> fired = new ArrayList<>();
+        input.gp1.a.onPress(() -> fired.add("base"));
+        input.gp1.layer(Key.LEFT_BUMPER).button(Key.A).onPress(() -> fired.add("layer"));
+        press(Key.LEFT_BUMPER);
+        press(Key.A);
+        tick(20);
+        assertEquals(java.util.Collections.singletonList("layer"), fired);
+        release(Key.A);
+        release(Key.LEFT_BUMPER);
+        tick(20);
+        press(Key.A);
+        tick(20);
+        assertEquals(java.util.Arrays.asList("layer", "base"), fired);
+    }
+
+    @Test
+    public void mostSpecificLayerWins() {
+        List<String> fired = new ArrayList<>();
+        input.gp1.a.onPress(() -> fired.add("base"));
+        input.gp1.layer(Key.LEFT_BUMPER).button(Key.A).onPress(() -> fired.add("lb"));
+        input.gp1.layer(Key.LEFT_BUMPER, Key.RIGHT_BUMPER).button(Key.A).onPress(() -> fired.add("lb+rb"));
+        input.gp1.layer(Key.RIGHT_BUMPER).button(Key.A).onPress(() -> fired.add("rb"));
+        press(Key.LEFT_BUMPER);
+        press(Key.RIGHT_BUMPER);
+        press(Key.A);
+        tick(20);
+        assertEquals(java.util.Collections.singletonList("lb+rb"), fired);
+        release(Key.A);
+        release(Key.RIGHT_BUMPER);
+        tick(20);
+        press(Key.A);
+        tick(20);
+        assertEquals(java.util.Arrays.asList("lb+rb", "lb"), fired);
+    }
+
+    @Test
+    public void layerIsSharedForTheSameModifiersInAnyOrder() {
+        assertSame(input.gp1.layer(Key.LEFT_BUMPER, Key.X), input.gp1.layer(Key.X, Key.LEFT_BUMPER));
+        assertSame(input.gp1.layer(Key.X).button(Key.A), input.gp1.layer(Key.X).button(Key.A));
+    }
+
+    @Test
+    public void profileCurveAppliesToEveryStick() {
+        Input curved = new Input(pad1, pad2, 0.1, 2.0, () -> nowNanos);
+        pad1.axes.put(PadAxis.LEFT_STICK_UP, 0.5);
+        pad1.axes.put(PadAxis.RIGHT_STICK_UP, 0.5);
+        assertEquals(input.gp1.leftStick.curve(2).up(), curved.gp1.leftStick.up(), 1e-9);
+        assertEquals(input.gp1.rightStick.curve(2).up(), curved.gp1.rightStick.up(), 1e-9);
+    }
+
+    @Test
+    public void layerReportsWhetherItsModifierIsHeld() {
+        Layer shift = input.gp2.layer(Key.RIGHT_BUMPER);
+        tick(20);
+        assertFalse(shift.isActive());
+        pad2.down.add(Key.RIGHT_BUMPER);
+        tick(20);
+        assertTrue(shift.isActive());
+    }
+
+    @Test
+    public void curveSoftensSmallDeflectionButKeepsFullScale() {
+        pad1.axes.put(PadAxis.LEFT_STICK_UP, 0.5);
+        double linear = input.gp1.leftStick.up();
+        double curved = input.gp1.leftStick.curve(2).up();
+        assertTrue(curved < linear);
+        pad1.axes.put(PadAxis.LEFT_STICK_UP, 1.0);
+        assertEquals(1.0, input.gp1.leftStick.curve(2).up(), 1e-9);
+    }
+
+    @Test
+    public void padOutputReachesTheSource() {
+        input.gp1.rumble(200);
+        input.gp1.rumbleBlips(2);
+        input.gp1.led(1, 0, 0);
+        assertEquals(java.util.Arrays.asList("rumble 1.0 1.0 200", "blips 2", "led 1.0 0.0 0.0"), pad1.output);
+    }
+
+    @Test
+    public void sampleAloneDoesNotFireBindings() {
+        List<String> fired = new ArrayList<>();
+        input.gp1.a.onPress(() -> fired.add("a"));
+        press(Key.A);
+        input.sample();
+        assertTrue(input.gp1.a.justPressed());
+        assertTrue(fired.isEmpty());
     }
 }

@@ -13,6 +13,8 @@ with a different claw run the same OpModes.
 ```java
 public interface Subsystem {
     default void update() {}
+    default InitResult init() { return InitResult.ok(); }
+    default void report(Report report) {}
     void stop();
 }
 ```
@@ -23,6 +25,9 @@ public interface Subsystem {
   `update()` applies it. Then five calls to `open()` in one loop cost one servo write, and every write happens at
   a predictable point in the tick.
 - Can emit events via `kernel.emit(...)`.
+
+**`init()`** runs once at the end of `new Robot()` and returns `ok`/`warn`/`fail` for the init screen. See
+[Init tasks](11-init-tasks.md). **`report(Report)`** adds lines to the status panel. See [Telemetry](10-telemetry.md).
 
 **`stop()`** puts outputs in a safe state. It's called when the OpMode stops and after any panic.
 - Must be idempotent and must not throw. (If it throws anyway, the kernel ignores it and keeps stopping the other

@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.kernel.input;
 
+import org.firstinspires.ftc.teamcode.kernel.UserClasses;
 import org.firstinspires.ftc.teamcode.kernel.errors.BindingPanic;
 import org.firstinspires.ftc.teamcode.kernel.input.annotations.OnDoubleTap;
 import org.firstinspires.ftc.teamcode.kernel.input.annotations.OnLongPress;
@@ -19,18 +20,9 @@ final class AnnotationBinder {
     private AnnotationBinder() {}
 
     static void bind(Input input, Object target) {
-        for (Class<?> type = target.getClass(); isUserClass(type); type = type.getSuperclass()) {
+        for (Class<?> type : UserClasses.of(target)) {
             for (Method method : type.getDeclaredMethods()) bindMethod(input, target, method);
         }
-    }
-
-    private static boolean isUserClass(Class<?> type) {
-        if (type == null || type == Object.class) return false;
-        String name = type.getName();
-        return !name.startsWith("com.qualcomm.")
-                && !name.startsWith("org.firstinspires.ftc.robotcore.")
-                && !name.startsWith("java.")
-                && !name.startsWith("android.");
     }
 
     private static void bindMethod(Input input, Object target, Method method) {
@@ -102,15 +94,14 @@ final class AnnotationBinder {
         if (spec.threshold <= 0 || spec.threshold > 1) {
             throw new BindingPanic(spec.annotation + "(" + spec.key + ") threshold must be in (0, 1], got " + spec.threshold);
         }
-        Pad pad = input.pad(spec.gamepad);
-        Button button = pad.button(spec.key, spec.threshold);
         for (Key modifier : spec.modifiers) {
             if (modifier == spec.key) {
                 throw new BindingPanic(spec.annotation + "(" + spec.key + ") lists " + modifier + " as its own modifier.");
             }
-            button = pad.button(modifier).and(button);
         }
-        return button;
+        Pad pad = input.pad(spec.gamepad);
+        if (spec.modifiers.length == 0) return pad.button(spec.key, spec.threshold);
+        return pad.layer(spec.modifiers).button(spec.key, spec.threshold);
     }
 
     private static void requirePositive(Spec spec, Method method, String attribute, long value) {

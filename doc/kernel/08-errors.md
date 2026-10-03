@@ -2,7 +2,7 @@
 
 The kernel fails loudly, early, and with instructions. There are three layers:
 
-1. **Compile-time errors**: misuse of key-binding annotations never reaches the robot.
+1. **Compile-time errors**: misuse of the kernel's annotations never reaches the robot.
 2. **Checked exceptions**: situations userspace or drivers must consciously handle.
 3. **Runtime panics**: unrecoverable problems. Outputs stop and the Driver Station says why.
 
@@ -52,7 +52,17 @@ BrokenBindings.java:14: error: [kernel] @OnPress(START) BrokenBindings.hidden() 
 The same key bound in two *different* classes is fine and produces no warning, since separate OpModes bind the
 same buttons all the time.
 
-The runtime binder repeats every one of these checks (as `BindingPanic`), so builds that skip annotation
+A second processor in the same module checks `@Watch` and `@Every`:
+
+| Rule                                                  | Example message (abridged)                                                  |
+|-------------------------------------------------------|-----------------------------------------------------------------------------|
+| not `static`                                          | `@Watch(speed) Driver.speed must not be static; ...`                        |
+| methods: not `private`, no parameters                 | `@Every(250) Driver.poll() must take no parameters.`                        |
+| `@Watch` methods return something                     | `@Watch(ready) Driver.ready() must return the value to show.`              |
+| `@Every` period > 0                                   | `@Every(0) Driver.poll() period must be > 0 ms, got 0.`                     |
+| one `@Watch` key per class                            | `@Watch(lift) Driver.b() duplicates another @Watch key in this class; ...` |
+
+The runtime binders repeat these checks (as `BindingPanic`), so builds that skip annotation
 processing (OnBotJava, or a missing `annotationProcessor` line) still fail at `new Robot()` instead of
 misbehaving mid-match.
 
@@ -62,7 +72,7 @@ The processor is tested in `KernelProcessor/src/test` (`./gradlew :KernelProcess
 
 ### `OpModeStoppedException extends InterruptedException`
 
-Thrown by `robot.waitUntil`, `robot.sleep` and `robot.waitForMotion` when stop is pressed mid-wait.
+Thrown by `robot.waitUntil`, `robot.sleep`, `robot.await` and `robot.awaitStart` when stop is pressed mid-wait.
 `runOpMode()` already declares `throws InterruptedException`, so a linear Auto needs no extra code and unwinds
 straight out. If you catch it to clean up, **rethrow it**.
 
@@ -90,7 +100,7 @@ The SDK clears the error message when the next OpMode starts.
 | `DeviceNotFoundPanic`        | `kernel.device(...)` name/type not in the Robot Configuration              | message lists configured devices; fix the name or config   |
 | `ProfileMisconfiguredPanic`  | `Profiles.ACTIVE` null; tuner config not pasted; `follower()` null; using a subsystem the profile lacks | follow the message                   |
 | `NoActiveOpModePanic`        | `new Robot()` outside a running OpMode                                     | construct inside `runOpMode()`/`init()`                    |
-| `WrongOpModeTypePanic`       | `waitUntil`/`sleep`/`waitForMotion` from an iterative `OpMode`             | poll in `loop()` or use `LinearOpMode`                     |
+| `WrongOpModeTypePanic`       | `waitUntil`/`sleep`/`await` from an iterative `OpMode`                     | poll in `loop()` or use `KernelOpMode`                     |
 | `BindingPanic`               | invalid annotation at bind time; a key binding or event handler threw      | message names the binding/event; cause is attached        |
 | `TickReentrancyPanic`        | `tick()` (or a blocking helper) called from inside a handler               | set a flag in the handler, act on it in the main loop      |
 

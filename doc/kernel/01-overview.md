@@ -17,20 +17,26 @@ It exists for two reasons:
 TeamCode/src/main/java/org/firstinspires/ftc/teamcode/
   kernel/
     Robot.java              userspace entry point
+    PlayAs.java             @PlayAs(Alliance.RED): pick the alliance per OpMode class
+    KernelOpMode.java       LinearOpMode base that owns robot, awaitStart and the tick loop
+    Awaitable.java          isSettled(), what robot.await(...) waits on
     Kernel.java             context handed to drivers (devices, other subsystems, events, voltage)
     Subsystem.java          update()/stop() contract every mechanism implements
     Alliance.java           BLUE/RED + coordinate mirroring
-    PoseStore.java          Auto -> TeleOp pose handoff
+    PoseStore.java          Auto -> TeleOp pose and alliance handoff
     Angles.java             wrap/error/toward helpers
     events/                 Event<T>, EventBus, Subscription
     input/                  Pad, Button, Trigger, Stick, Key, Input, annotations/
-    motion/                 Motion (userspace API), PedroMotion (driver), MotionTuning
-    subsystems/             userspace-facing mechanism interfaces (Claw, Lift)
-    drivers/                hardware implementations (ServoClaw, MotorLift)
+    motion/                 Motion (userspace API), PedroMotion (driver), MotionTuning, Route (straight paths)
+    subsystems/             userspace-facing mechanism interfaces (Claw, Lift, Intake, Flywheel, Turret, Rangefinder)
+    drivers/                hardware implementations (ServoClaw, MotorLift, MotorIntake, ...)
+    telemetry/              KernelTelemetry (robot.telemetry), Report
+    init/                   InitTask, InitResult, InitLog
+    time/                   Scheduler (after/every), MatchClock, LoopTimer
     profiles/               RobotProfile, CompBot, Profiles.ACTIVE
     errors/                 KernelPanic and friends, checked exceptions
-  opmodes/                  ExampleTeleOp, ExampleAuto
-KernelProcessor/            annotation processor: compile-time checks for key bindings
+  opmodes/                  ExampleTeleOp, ExampleAuto, ExampleRedAuto (ExampleAuto under @PlayAs(RED))
+KernelProcessor/            annotation processors: compile-time checks for key bindings, @Watch and @Every
 ```
 
 ## The boundary
@@ -53,10 +59,12 @@ Every `robot.tick()` runs these stages, in this order, on the calling thread:
  robot.tick()
    │
    ├─ 1. clear bulk caches ........ every hub's MANUAL cache is invalidated; the next read is fresh
-   ├─ 2. input.update() ........... snapshot both gamepads, compute edges, fire key bindings
+   ├─ 2. input .................... snapshot both gamepads, compute edges; fire key bindings once started
    ├─ 3. motion.update() .......... drive/aim math → follower.update() → advance the path queue
-   ├─ 4. subsystem.update() ....... each mechanism, in profile install order (claw, then lift)
-   └─ 5. events.dispatch() ........ deliver everything emitted during 2–4, in emit order
+   ├─ 4. subsystem.update() ....... each mechanism, in install order (claw, lift, intake, flywheel, turret, ...)
+   ├─ 5. timers + match clock ..... due robot.after()/every() callbacks run; ENDGAME/ENDING are emitted
+   ├─ 6. events.dispatch() ........ deliver everything emitted during 2–5, in emit order
+   └─ 7. telemetry ................ every ~100 ms, publish the status panel plus your data()/line()/watch()
 ```
 
 Consequences worth knowing:

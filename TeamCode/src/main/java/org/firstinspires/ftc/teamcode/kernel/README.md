@@ -44,35 +44,34 @@ That's it. No arguments. The kernel finds your OpMode on its own. It knows. It a
 
 | you want to…                | you call                                                                 |
 |-----------------------------|--------------------------------------------------------------------------|
-| drive                       | `robot.motion.drive(forward, left, counterClockwise)`                    |
+| drive                       | `robot.motion.drive(robot.gp1.leftStick, robot.gp1.rightStick)`          |
+| creep                       | `robot.motion.setSpeedScale(0.35)`                                       |
 | follow a path               | `robot.motion.follow(path)`                                              |
 | queue paths                 | `robot.motion.queue(p1, p2, p3)`                                         |
 | stare at a point menacingly | `robot.motion.aimTo(point)`                                              |
-| turn in place               | `robot.motion.turnTo(heading)`                                           |
+| go somewhere                | `robot.motion.goTo(pose)`                                                |
+| turn in place               | `robot.motion.turnTo(heading)`, `robot.motion.turnBy(radians)`           |
 | stay put                    | `robot.motion.hold()`                                                    |
 | stop everything             | `robot.motion.cancel()`                                                  |
-| wait (Auto)                 | `robot.waitForMotion()`, `robot.sleep(ms)`, `robot.waitUntil(() -> …)`   |
+| wait (Auto)                 | `robot.await(robot.motion.goTo(pose))`, `robot.sleep(ms)`, `robot.waitUntil(() -> …)` |
 | react to something          | `robot.on(Motion.PATH_DONE, path -> …)`                                  |
 | use a mechanism             | `robot.claw.open()`, `robot.lift.goTo(Lift.Level.HIGH)`                  |
+| say something               | `robot.telemetry.data("k", v)`, `@Watch("k") double k() { … }`           |
+| do it in half a second      | `robot.after(500, () -> …)`, `@Every(250) void poll() { … }`             |
+| be told it's endgame        | `robot.on(MatchClock.ENDGAME, () -> …)`                                  |
+| tap someone on the shoulder | `robot.gp2.rumble(200)`, `robot.gp1.led(1, 0, 0)`                        |
 | read a button               | `robot.gp1.a.justPressed()`                                              |
 | bind a button               | `@OnPress(Key.A) void grab() { … }`                                      |
-| play for red                | `robot.alliance(Alliance.RED)`                                           |
+| play for red                | `@PlayAs(Alliance.RED)` on the OpMode class                             |
 
 ## A TeleOp, as the kernel intended
 
 ```java
 @TeleOp(name = "Drive")
-public class Drive extends LinearOpMode {
-    private Robot robot;
-
+public class Drive extends KernelOpMode {
     @Override
-    public void runOpMode() throws InterruptedException {
-        robot = new Robot();
-        waitForStart();
-        while (opModeIsActive()) {
-            robot.motion.drive(robot.gp1.leftStick.up(), robot.gp1.leftStick.left(), robot.gp1.rightStick.left());
-            robot.tick();
-        }
+    protected void onLoop() {
+        robot.motion.drive(robot.gp1.leftStick, robot.gp1.rightStick);
     }
 
     @OnPress(Key.A)
@@ -93,16 +92,20 @@ public class Drive extends LinearOpMode {
 ```
 
 Notice what's missing: `hardwareMap`, `gamepad1.a && !lastA`, `follower.update()`, `LynxModule`,
-the will to debug any of it.
+`robot.tick()` (KernelOpMode calls it so you can't forget), the will to debug any of it.
 
 ## An Auto, as the kernel intended
 
 ```java
-robot.motion.queue(toBasket, toSample, backToBasket);
-robot.waitForMotion();
+@Override
+protected void onStart() throws InterruptedException {
+    robot.await(robot.motion.follow(Route.line(start, basket)), robot.lift.goTo(Lift.Level.HIGH));
+    robot.claw.open();
+    robot.await(robot.motion.follow(Route.line(basket, sample)));
+}
 ```
 
-Press stop in the middle of that and `waitForMotion()` throws `OpModeStoppedException`, which *is an*
+Press stop in the middle of that and `await()` throws `OpModeStoppedException`, which *is an*
 `InterruptedException`, which `runOpMode()` already declares. Your Auto unwinds cleanly. Nobody
 had to write `if (isStopRequested()) return;` fourteen times.
 
@@ -123,7 +126,7 @@ Driver Station.*
 
 ```
 KERNEL PANIC: robot.tick() was called from inside a tick. A key binding or event handler probably called
-tick(), waitUntil(), sleep() or waitForMotion(). Handlers must not block; set a flag and handle it in your
+tick(), waitUntil(), sleep() or await(). Handlers must not block; set a flag and handle it in your
 main loop.
 ```
 *Someone put `robot.sleep(500)` in an `@OnPress`. Handlers run inside the tick. The tick does not
@@ -193,6 +196,9 @@ The jokes stop here. [`doc/kernel/`](../../../../../../../../../doc/kernel/) has
 7. [Writing subsystems](../../../../../../../../../doc/kernel/07-writing-subsystems.md)
 8. [Errors](../../../../../../../../../doc/kernel/08-errors.md): every exception and every compile-time check
 9. [Lifecycle](../../../../../../../../../doc/kernel/09-lifecycle.md): pose handoff, safe stop, bulk caching
+10. [Telemetry](../../../../../../../../../doc/kernel/10-telemetry.md): `robot.telemetry`, the status panel, `report()`
+11. [Init tasks](../../../../../../../../../doc/kernel/11-init-tasks.md): boot checks, `awaitStart()`
+12. [Timers and the match clock](../../../../../../../../../doc/kernel/12-timers-and-match.md)
 
 ```
 [ 1337.000000] kernel: userspace exited with code 0. motors zeroed. goodnight.

@@ -12,6 +12,7 @@ import com.pedropathing.math.Pose;
 import com.pedropathing.math.Vector2D;
 import com.pedropathing.paths.Path;
 
+import org.firstinspires.ftc.teamcode.kernel.Angles;
 import org.firstinspires.ftc.teamcode.kernel.events.EventBus;
 import org.junit.Before;
 import org.junit.Test;
@@ -203,5 +204,67 @@ public class PedroMotionTest {
         assertEquals(0, motion.queued());
         assertFalse(motion.isAiming());
         assertEquals(1, follower.stops);
+    }
+
+    @Test
+    public void goToFollowsAStraightLineFromTheCurrentPose() {
+        follower.pose = new Pose(5, 5, 0);
+        motion.goTo(new Pose(30, 5, Math.PI / 2));
+        tick();
+        assertEquals(1, follower.followed.size());
+        assertEquals(Motion.Mode.FOLLOW, motion.mode());
+        assertEquals(30, follower.followed.get(0).endPose().x(), EPS);
+    }
+
+    @Test
+    public void goToReplacesQueuedPaths() {
+        motion.queue(first, second);
+        motion.goTo(new Pose(50, 50, 0));
+        assertEquals(0, motion.queued());
+    }
+
+    @Test
+    public void goToWhereWeAlreadyAreJustTurns() {
+        follower.pose = new Pose(10, 10, 0);
+        motion.goTo(new Pose(10, 10, 1.0));
+        assertEquals(Motion.Mode.TURN, motion.mode());
+        assertTrue(follower.followed.isEmpty());
+    }
+
+    @Test
+    public void turnByIsRelativeToCurrentHeadingAndWraps() {
+        follower.pose = new Pose(0, 0, Math.toRadians(170));
+        motion.turnBy(Math.toRadians(20));
+        assertEquals(Motion.Mode.TURN, motion.mode());
+        assertEquals(0, Angles.error(Math.toRadians(-170), follower.holding.heading()), 1e-9);
+    }
+
+    @Test
+    public void speedScaleShrinksDriverInputButNotTakeover() {
+        tuning.driverTakeoverThreshold = 0.1;
+        motion.setSpeedScale(0.25);
+        motion.queue(first);
+        motion.drive(0.2, 0, 0);
+        tick();
+        assertEquals(Motion.Mode.DRIVE, motion.mode());
+        assertArrayEquals(new double[]{0.05, 0, 0}, follower.lastManual, EPS);
+    }
+
+    @Test
+    public void commandsReturnTheMotionSoTheyCanBeAwaited() {
+        assertSame(motion, motion.follow(first));
+        assertFalse(motion.isSettled());
+        finishCurrentPath();
+        assertTrue(motion.isSettled());
+        assertSame(motion, motion.turnBy(1.0));
+        assertFalse(motion.isSettled());
+    }
+
+    @Test
+    public void routeThroughBuildsOneLegPerConsecutivePair() {
+        Path[] legs = Route.through(new Pose(0, 0, 0), new Pose(10, 0, 0), new Pose(10, 10, Math.PI / 2));
+        assertEquals(2, legs.length);
+        assertEquals(10, legs[0].endPose().x(), EPS);
+        assertEquals(10, legs[1].endPose().y(), EPS);
     }
 }

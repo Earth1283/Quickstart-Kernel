@@ -6,6 +6,7 @@ import org.firstinspires.ftc.teamcode.kernel.Kernel;
 import org.firstinspires.ftc.teamcode.kernel.errors.SubsystemUnavailableException;
 import org.firstinspires.ftc.teamcode.kernel.subsystems.Claw;
 import org.firstinspires.ftc.teamcode.kernel.subsystems.Lift;
+import org.firstinspires.ftc.teamcode.kernel.telemetry.Report;
 
 public final class ServoClaw implements Claw {
     private final Kernel kernel;
@@ -66,6 +67,11 @@ public final class ServoClaw implements Claw {
         if (!positionDirty) return;
         servo.setPosition(open ? openPosition : closedPosition);
         positionDirty = false;
+    }
+
+    @Override
+    public void report(Report report) {
+        report.data("open", open);
     }
 
     // A servo holds its last position; leaving it is safer than yanking it somewhere new.

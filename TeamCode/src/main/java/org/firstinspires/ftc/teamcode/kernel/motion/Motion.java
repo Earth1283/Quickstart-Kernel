@@ -4,9 +4,11 @@ import com.pedropathing.math.Pose;
 import com.pedropathing.math.Vector2D;
 import com.pedropathing.paths.Path;
 
+import org.firstinspires.ftc.teamcode.kernel.Awaitable;
 import org.firstinspires.ftc.teamcode.kernel.events.Event;
+import org.firstinspires.ftc.teamcode.kernel.input.Stick;
 
-public interface Motion {
+public interface Motion extends Awaitable {
     Event<Path> PATH_DONE = Event.of("motion.pathDone");
     Event<Void> QUEUE_EMPTY = Event.of("motion.queueEmpty");
     Event<Double> TURN_DONE = Event.of("motion.turnDone");
@@ -17,9 +19,21 @@ public interface Motion {
     // calling drive() stops the robot. Near-zero input doesn't interrupt a path, turn, or hold.
     void drive(double forward, double left, double counterClockwise);
 
-    void follow(Path path);
+    default void drive(Stick translate, Stick rotate) {
+        drive(translate.up(), translate.left(), rotate.left());
+    }
 
-    void queue(Path... paths);
+    // Scales driver input only; paths, turns and aiming keep full speed.
+    void setSpeedScale(double scale);
+
+    Motion follow(Path path);
+
+    Motion queue(Path... paths);
+
+    // Straight line from wherever the robot is now, turning to the target's heading along the way.
+    Motion goTo(Pose target);
+
+    Motion turnBy(double radians);
 
     void aimTo(Vector2D target);
 
@@ -27,9 +41,9 @@ public interface Motion {
 
     boolean isAiming();
 
-    void turnTo(double heading);
+    Motion turnTo(double heading);
 
-    void hold();
+    Motion hold();
 
     void cancel();
 
@@ -40,6 +54,11 @@ public interface Motion {
     void resetDriverForward();
 
     boolean isBusy();
+
+    @Override
+    default boolean isSettled() {
+        return !isBusy();
+    }
 
     int queued();
 
